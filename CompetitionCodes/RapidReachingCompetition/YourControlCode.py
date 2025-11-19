@@ -17,7 +17,7 @@ class YourCtrl:
     self.ee_id = mujoco.mj_name2id(self.m, mujoco.mjtObj.mjOBJ_BODY, "EE_Frame")
 
   def getIK(self, goal, initq):
-      
+    #TODO: add orientation error caculation, keep current dataT.xquat[self.ee_id].copy()
     dataT = mujoco.MjData(self.m)
     intr = 0
     dataT.qpos[:] = initq.copy() 
@@ -46,12 +46,13 @@ class YourCtrl:
   def CtrlUpdate(self):
   
     #temp
-    goal = self.target_points[:, 3]
+    goal = self.target_points[:, 5]
     q_d = self.getIK(goal, self.d.qpos)
 
     M = np.zeros((6,6))
     mujoco.mj_fullM(self.m, M, self.d.qM)  
 
+    #TODO:check if torque code is correct
     jtorque_cmd = M@(self.kp*(q_d - self.d.qpos) - self.kd*self.d.qvel)+ self.d.qfrc_bias
 
     # for i in range(6):
