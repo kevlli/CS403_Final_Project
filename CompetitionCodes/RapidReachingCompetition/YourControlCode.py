@@ -57,6 +57,8 @@ class YourCtrl:
       #call bestpath?
       self.current_idx+=1
       goal = self.target_points[:, self.current_idx]
+      if self.current_idx == 8:
+        return np.zeros((6,6))
 
     q_d = self.getIK(goal, self.d.qpos)
 
