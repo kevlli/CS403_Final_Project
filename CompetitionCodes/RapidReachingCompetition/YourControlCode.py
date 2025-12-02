@@ -1,5 +1,6 @@
 import mujoco
 import numpy as np
+from itertools import permutations
 
 
 class YourCtrl:
@@ -7,7 +8,6 @@ class YourCtrl:
     self.m = m
     self.d = d
     self.target_points = target_points
-    self.order = [2, 1, 5, 0, 3, 7, 4, 6]
 
     self.init_qpos = d.qpos.copy()
 
@@ -18,11 +18,14 @@ class YourCtrl:
     self.ee_id = mujoco.mj_name2id(self.m, mujoco.mjtObj.mjOBJ_BODY, "EE_Frame")
     self.current_idx = 0
 
+    #as of now we can only run in a specific order
+    self.order = [2, 1, 5, 0, 3, 7, 4, 6]
+    #but below is the fastest order
+    # self.order = list(self.best_path(self.target_points))
+
   def getIK(self, target_position, max_iters = 4):
-    #TODO: add orientation error caculation, keep current self.d.xquat[self.ee_id].copy()
     intr = 0
 
-    point = np.zeros(3)
     ee_id = self.ee_id
     dx = target_position-self.d.xpos[ee_id].copy()
     jacp =  np.zeros((3, self.m.nv)) 
@@ -44,16 +47,33 @@ class YourCtrl:
       self.d.qpos[:6] = target_jpos 
       mujoco.mj_kinematics(self.m, self.d)
       
-      
       intr+=1
+
     self.d.qpos[:6] = np.copy(initial_jpos)
     jpos_error = target_jpos - self.d.qpos[:6]
     velocity = self.d.qvel[:6]
     return jpos_error, velocity
   
   def best_path(self, target_points):
-    #determine either the best path or the next best node to get
-    pass
+    ee_pos = self.d.xpos[self.ee_id].copy()
+    a = [0,1,2,3,4,5,6,7]
+    total_dis = float('inf')
+    fast_order = []
+
+    dist_between = np.zeros((8,8))
+    for j in range(8):
+      for i in range(8):
+        dist_between[j,i] = np.linalg.norm(target_points[:,j] - target_points[:,i])
+
+    for p in permutations(a):
+      temp_dis = np.linalg.norm(ee_pos - target_points[:,p[0]])
+      for i in range(7):
+        temp_dis+=dist_between[p[i], p[i+1]]
+      if temp_dis<total_dis:
+        fast_order = p
+        total_dis = temp_dis
+
+    return fast_order
 
   def CtrlUpdate(self):
     
@@ -70,7 +90,6 @@ class YourCtrl:
     M = np.zeros((6,6))
     mujoco.mj_fullM(self.m, M, self.d.qM)  
 
-    #TODO:Use Operational Space Dynamics from HW6 and lecturue 22
     jtorque_cmd = M@(self.kp*(jpos_error) - self.kd*velocity)+ self.d.qfrc_bias
 
     return jtorque_cmd
