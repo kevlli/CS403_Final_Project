@@ -7,6 +7,7 @@ class YourCtrl:
     self.m = m
     self.d = d
     self.target_points = target_points
+    self.order = [2, 1, 5, 0, 3, 7, 4, 6]
 
     self.init_qpos = d.qpos.copy()
 
@@ -17,7 +18,7 @@ class YourCtrl:
     self.ee_id = mujoco.mj_name2id(self.m, mujoco.mjtObj.mjOBJ_BODY, "EE_Frame")
     self.current_idx = 0
 
-  def getIK(self, target_position):
+  def getIK(self, target_position, max_iters = 4):
     #TODO: add orientation error caculation, keep current self.d.xquat[self.ee_id].copy()
     intr = 0
 
@@ -30,7 +31,7 @@ class YourCtrl:
     initial_jpos = np.copy(self.d.qpos[:6])
     target_jpos = np.copy(initial_jpos)
 
-    while np.linalg.norm(dx) >= 0.01 and intr<3:
+    while np.linalg.norm(dx) >= 0.01 and intr< max_iters:
       mujoco.mj_jac(self.m, self.d, jacp, jcar, self.d.xpos[self.ee_id], self.ee_id)
       EE_pos = self.d.body(ee_id).xpos
       J = jacp.copy()
@@ -56,17 +57,13 @@ class YourCtrl:
 
   def CtrlUpdate(self):
     
-    #call best_path
-    target_position = self.target_points[:, self.current_idx]
+    index = self.order[0]
+    target_position = self.target_points[:, index].copy()
 
     ee_pos = self.d.xpos[self.ee_id].copy()
     distance = np.linalg.norm(ee_pos - target_position)
     if distance < 0.01:
-      #call bestpath?
-      self.current_idx+=1
-      target_position = self.target_points[:, self.current_idx]
-      if self.current_idx == 8:
-        return np.zeros((6,6))
+      self.order.pop(0)
 
     jpos_error, velocity = self.getIK(target_position)
 
